@@ -19,6 +19,7 @@ class ScanData(object):
     def __init__(self):
         self.scantime = time.gmtime()
         self.hosts = {}
+        self.dnsmap = {}
 
     def get_hosts(self):
         return self.hosts.keys()
@@ -34,29 +35,31 @@ class ScanData(object):
             return False
         return True
 
-    def add_open(self, addr, port, proto):
+    def add_open(self, addr, port, proto, hn):
         if proto != 'tcp' and proto != 'udp':
             raise Exception('unknown protocol %s' % proto)
         if addr not in self.hosts:
             self.hosts[addr] = []
+        self.dnsmap[addr] = hn
         self.hosts[addr].append([int(port), proto])
 
 class Alert(object):
-    def __init__(self, host, port, proto):
+    def __init__(self, host, port, proto, dns):
         self.host = host
         self.port = port
         self.proto = proto
+        self.dns = dns
         self.open_prev = None
         self.closed_prev = None
 
     @staticmethod
     def alert_header():
-        return '%s%s%s%s' % ('STATUS'.ljust(8), 'HOST'.ljust(16),
-            'PORT'.ljust(8), 'PROTO'.ljust(8))
+        return '%s%s%s%s%s' % ('STATUS'.ljust(8), 'HOST'.ljust(16),
+            'PORT'.ljust(8), 'PROTO'.ljust(8), 'DNS')
 
     def __str__(self):
-        return '%s%s%s' % (self.host.ljust(16),
-            str(self.port).ljust(8), self.proto.ljust(8))
+        return '%s%s%s%s' % (self.host.ljust(16),
+            str(self.port).ljust(8), self.proto.ljust(8), self.dns)
 
 class ScanState(object):
     KEEP_SCANS = 7
@@ -89,7 +92,8 @@ class ScanState(object):
             for p in self._lastscan.get_host_ports(i):
                 prevscan = self._scanlist[1]
                 if not prevscan.open_exists(i, p[0], p[1]):
-                    self._alerts_open.append(Alert(i, p[0], p[1]))
+                    dns = self._lastscan.dnsmap[i]
+                    self._alerts_open.append(Alert(i, p[0], p[1], dns))
 
     def calculate_new_closed(self):
         if len(self._scanlist) <= 1:
@@ -98,7 +102,8 @@ class ScanState(object):
         for i in prevscan.get_hosts():
             for p in prevscan.get_host_ports(i):
                 if not self._lastscan.open_exists(i, p[0], p[1]):
-                    self._alerts_closed.append(Alert(i, p[0], p[1]))
+                    dns = self._lastscan.dnsmap[i]
+                    self._alerts_closed.append(Alert(i, p[0], p[1], dns))
 
     def print_open_alerts(self):
         sys.stdout.write('%s\n' % Alert.alert_header())
@@ -142,14 +147,17 @@ def parse_output(path):
         if buf == '':
             break
         buf = buf.strip()
-        m = re.search('Host: (\S+).*Ports: (.*)$', buf)
+        m = re.search('Host: (\S+) \(([^)]*)\).*Ports: (.*)$', buf)
         if m != None:
             addr = m.group(1)
-            p = [x.split('/') for x in m.group(2).split(',')]
+            hn = m.group(2)
+            if len(hn) == 0:
+                hn = 'unknown'
+            p = [x.split('/') for x in m.group(3).split(',')]
             for i in p:
                 if i[1] != 'open':
                     continue
-                new.add_open(addr.strip(), i[0].strip(), i[2].strip())
+                new.add_open(addr.strip(), i[0].strip(), i[2].strip(), hn)
     f.close()
 
     state.set_last(new)
@@ -194,7 +202,12 @@ def domain():
 
     run_nmap(targetfile)
     state.calculate()
+    sys.stdout.write('New Open Service List\n')
+    sys.stdout.write('---------------------\n')
     state.print_open_alerts()
+    sys.stdout.write('\n')
+    sys.stdout.write('New Closed Service List\n')
+    sys.stdout.write('-----------------------\n')
     state.print_closed_alerts()
 
     write_scanstate()
