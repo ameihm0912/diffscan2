@@ -44,22 +44,25 @@ class ScanData(object):
         self.hosts[addr].append([int(port), proto])
 
 class Alert(object):
-    def __init__(self, host, port, proto, dns):
+    def __init__(self, host, port, proto, dns, open_prev, closed_prev):
         self.host = host
         self.port = port
         self.proto = proto
         self.dns = dns
-        self.open_prev = None
-        self.closed_prev = None
+        self.open_prev = open_prev
+        self.closed_prev = closed_prev
 
     @staticmethod
     def alert_header():
-        return '%s%s%s%s%s' % ('STATUS'.ljust(8), 'HOST'.ljust(16),
-            'PORT'.ljust(8), 'PROTO'.ljust(8), 'DNS')
+        return '%s%s%s%s%s%s%s' % ('STATUS'.ljust(8), 'HOST'.ljust(16),
+            'PORT'.ljust(8), 'PROTO'.ljust(8), 'OPREV'.ljust(6),
+            'CPREV'.ljust(6), 'DNS')
 
     def __str__(self):
-        return '%s%s%s%s' % (self.host.ljust(16),
-            str(self.port).ljust(8), self.proto.ljust(8), self.dns)
+        return '%s%s%s%s%s%s' % (self.host.ljust(16),
+            str(self.port).ljust(8), self.proto.ljust(8),
+            str(self.open_prev).ljust(6), str(self.closed_prev).ljust(6),
+            self.dns)
 
 class ScanState(object):
     KEEP_SCANS = 7
@@ -85,6 +88,19 @@ class ScanState(object):
         self.calculate_new_open()
         self.calculate_new_closed()
 
+    def prev_service_status(self, addr, port, proto):
+        openprev = 0
+        closedprev = 0
+        for s in self._scanlist[1:]:
+            if s.open_exists(addr, port, proto):
+                openprev += 1
+            else:
+                closedprev += 1
+        return (openprev, closedprev)
+
+    def find_closed_prev(self, addr, port, proto):
+        pass
+
     def calculate_new_open(self):
         if len(self._scanlist) <= 1:
             return
@@ -93,7 +109,10 @@ class ScanState(object):
                 prevscan = self._scanlist[1]
                 if not prevscan.open_exists(i, p[0], p[1]):
                     dns = self._lastscan.dnsmap[i]
-                    self._alerts_open.append(Alert(i, p[0], p[1], dns))
+                    openprev, closedprev = \
+                        self.prev_service_status(i, p[0], p[1])
+                    self._alerts_open.append(Alert(i, p[0], p[1], dns,
+                        openprev, closedprev))
 
     def calculate_new_closed(self):
         if len(self._scanlist) <= 1:
@@ -103,7 +122,10 @@ class ScanState(object):
             for p in prevscan.get_host_ports(i):
                 if not self._lastscan.open_exists(i, p[0], p[1]):
                     dns = self._lastscan.dnsmap[i]
-                    self._alerts_closed.append(Alert(i, p[0], p[1], dns))
+                    openprev, closedprev = \
+                        self.prev_service_status(i, p[0], p[1])
+                    self._alerts_closed.append(Alert(i, p[0], p[1], dns,
+                        openprev, closedprev))
 
     def print_open_alerts(self):
         sys.stdout.write('%s\n' % Alert.alert_header())
@@ -162,6 +184,9 @@ def parse_output(path):
 
     state.set_last(new)
 
+def diffscan_fail():
+    sys.exit(1)
+
 def run_nmap(targets):
     nmap_args = []
     nmap_args += nmap_scanoptions.split()
@@ -171,7 +196,14 @@ def run_nmap(targets):
     nmap_args += nmap_logoptions.substitute(tmppath=tf[1]).split()
     nmap_args += nmap_inoptions.substitute(inpath=targets).split()
 
-    subprocess.call(['nmap',] + nmap_args)
+    nfd = open('/dev/null', 'w')
+    ret = subprocess.call(['nmap',] + nmap_args, stdout=nfd)
+    nfd.close()
+
+    if ret != 0:
+        sys.stdout.write('nmap failed with return code %d, exiting\n' \
+            % ret)
+        diffscan_fail()
 
     parse_output(tf[1])
 
@@ -200,6 +232,8 @@ def domain():
 
     state = load_scanstate()
 
+    sys.stdout.write('diffscan2 results output\n\n')
+
     run_nmap(targetfile)
     state.calculate()
     sys.stdout.write('New Open Service List\n')
@@ -209,6 +243,13 @@ def domain():
     sys.stdout.write('New Closed Service List\n')
     sys.stdout.write('-----------------------\n')
     state.print_closed_alerts()
+
+    sys.stdout.write('\n')
+    sys.stdout.write('OPREV: number of times service was open in previous ' \
+        'scans\n')
+    sys.stdout.write('CPREV: number of times service was closed in ' \
+        'previous scans\n')
+    sys.stdout.write('maximum previous scans stored: %d\n' % state.KEEP_SCANS)
 
     write_scanstate()
 
