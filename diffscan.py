@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import cPickle
 import errno
+import tempfile
 
 nmap_scanoptions = '-sS -vv --top-ports 20 -T4'
 nmap_logoptions = Template('-oG $tmppath')
@@ -72,6 +73,13 @@ class ScanState(object):
         self._scanlist = []
         self._alerts_open = []
         self._alerts_closed = []
+        self._outfile = None
+
+    def register_outfile(self, o):
+        self._outfile = o
+
+    def clear_outfile(self):
+        self._outfile = None
 
     def clear_alerts(self):
         self._alerts_open = []
@@ -128,16 +136,18 @@ class ScanState(object):
                         openprev, closedprev))
 
     def print_open_alerts(self):
-        sys.stdout.write('%s\n' % Alert.alert_header())
+        self._outfile.write('%s\n' % Alert.alert_header())
         for i in self._alerts_open:
-            sys.stdout.write('OPEN    %s\n' % str(i))
+            self._outfile.write('OPEN    %s\n' % str(i))
 
     def print_closed_alerts(self):
-        sys.stdout.write('%s\n' % Alert.alert_header())
+        self._outfile.write('%s\n' % Alert.alert_header())
         for i in self._alerts_closed:
-            sys.stdout.write('CLOSED  %s\n' % str(i))
+            self._outfile.write('CLOSED  %s\n' % str(i))
 
 state = None
+tmpfile = None
+debugging = False
 
 statefile = './diffscan.state'
 
@@ -201,7 +211,7 @@ def run_nmap(targets):
     nfd.close()
 
     if ret != 0:
-        sys.stdout.write('nmap failed with return code %d, exiting\n' \
+        tmpfile.write('nmap failed with return code %d, exiting\n' \
             % ret)
         diffscan_fail()
 
@@ -210,7 +220,8 @@ def run_nmap(targets):
     os.remove(tf[1])
 
 def usage():
-    sys.stdout.write('usage: diffscan.py [-s path] [-h] targets_file\n')
+    sys.stdout.write('usage: diffscan.py [-d] [-s path] [-h] targets_file ' \
+        'recipient\n')
     sys.exit(0)
 
 def domain():
@@ -218,40 +229,65 @@ def domain():
     global state
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'hs:')
+        opts, args = getopt.getopt(sys.argv[1:], 'dhs:')
     except getopt.GetoptError:
         usage()
     for o, a in opts:
         if o == '-h':
             usage()
+        elif o == '-d':
+            debugging = True
         elif o == '-s':
             statefile = a
     if len(args) == 0:
         usage()
     targetfile = args[0]
+    recip = args[1]
 
     state = load_scanstate()
 
-    sys.stdout.write('diffscan2 results output\n\n')
+    tmpout = tempfile.mkstemp()
+    tmpfile = os.fdopen(tmpout[0], 'w')
+    state.register_outfile(tmpfile)
+
+    hn = os.uname()[1]
+    tmpfile.write('Subject: diffscan2 %s\n' % hn)
+    tmpfile.write('From: diffscan2 <noreply@%s>\n' % hn)
+    tmpfile.write('To: %s\n' % recip)
+    tmpfile.write('\n')
+
+    tmpfile.write('diffscan2 results output\n\n')
 
     run_nmap(targetfile)
     state.calculate()
-    sys.stdout.write('New Open Service List\n')
-    sys.stdout.write('---------------------\n')
+    tmpfile.write('New Open Service List\n')
+    tmpfile.write('---------------------\n')
     state.print_open_alerts()
-    sys.stdout.write('\n')
-    sys.stdout.write('New Closed Service List\n')
-    sys.stdout.write('-----------------------\n')
+    tmpfile.write('\n')
+    tmpfile.write('New Closed Service List\n')
+    tmpfile.write('-----------------------\n')
     state.print_closed_alerts()
 
-    sys.stdout.write('\n')
-    sys.stdout.write('OPREV: number of times service was open in previous ' \
+    tmpfile.write('\n')
+    tmpfile.write('OPREV: number of times service was open in previous ' \
         'scans\n')
-    sys.stdout.write('CPREV: number of times service was closed in ' \
+    tmpfile.write('CPREV: number of times service was closed in ' \
         'previous scans\n')
-    sys.stdout.write('maximum previous scans stored: %d\n' % state.KEEP_SCANS)
+    tmpfile.write('maximum previous scans stored: %d\n' % state.KEEP_SCANS)
 
+    state.clear_outfile()
     write_scanstate()
+
+    tmpfile.close()
+
+    f = open(tmpout[1], 'r')
+    buf = f.read()
+    f.close()
+    if debugging:
+        sys.stdout.write(buf)
+    sp = subprocess.Popen(['sendmail', '-t'], stdin=subprocess.PIPE)
+    sp.communicate(buf)
+    os.remove(tmpout[1])
 
 if __name__ == '__main__':
     domain()
