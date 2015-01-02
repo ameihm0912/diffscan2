@@ -68,14 +68,12 @@ class Alert(object):
 
     @staticmethod
     def alert_header():
-        return '%s%s%s%s%s%s%s' % ('STATUS'.ljust(8), 'HOST'.ljust(16),
-            'PORT'.ljust(8), 'PROTO'.ljust(8), 'OPREV'.ljust(6),
-            'CPREV'.ljust(6), 'DNS')
+        return 'STATUS HOST PORT PROTO OPREV CPREV DNS'
 
     def __str__(self):
-        return '%s%s%s%s%s%s' % (self.host.ljust(16),
-            str(self.port).ljust(8), self.proto.ljust(8),
-            str(self.open_prev).ljust(6), str(self.closed_prev).ljust(6),
+        return '%s %s %s %s %s %s' % (self.host,
+            str(self.port), self.proto,
+            str(self.open_prev), str(self.closed_prev),
             self.dns)
 
 class ScanState(object):
@@ -158,12 +156,12 @@ class ScanState(object):
     def print_open_alerts(self):
         self._outfile.write('%s\n' % Alert.alert_header())
         for i in self._alerts_open:
-            self._outfile.write('OPEN    %s\n' % str(i))
+            self._outfile.write('OPEN %s\n' % str(i))
 
     def print_closed_alerts(self):
         self._outfile.write('%s\n' % Alert.alert_header())
         for i in self._alerts_closed:
-            self._outfile.write('CLOSED  %s\n' % str(i))
+            self._outfile.write('CLOSED %s\n' % str(i))
 
 state = None
 tmpfile = None
@@ -287,7 +285,7 @@ def domain():
     state.print_open_alerts()
     tmpfile.write('\n')
     tmpfile.write('New Closed Service List\n')
-    tmpfile.write('-----------------------\n')
+    tmpfile.write('---------------------\n')
     state.print_closed_alerts()
 
     tmpfile.write('\n')
