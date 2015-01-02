@@ -12,6 +12,11 @@ import cPickle
 import errno
 import tempfile
 
+# Edit the nmap_scanoptions variable below to configure generic options
+# that are passed by nmap to the script. This script generates email using
+# the sendmail command, so also ensure that command is in your path when
+# it is run.
+
 # Change this to suit your environment
 nmap_scanoptions = '-sS -vv --top-ports 20 -T4'
 
