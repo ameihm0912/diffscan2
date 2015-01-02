@@ -229,6 +229,7 @@ def usage():
 def domain():
     global statefile
     global state
+    global tmpfile
 
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'dhs:')
