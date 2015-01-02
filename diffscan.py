@@ -43,6 +43,12 @@ class ScanData(object):
             return False
         return True
 
+    def total_services(self):
+        ret = 0
+        for i in self.hosts:
+            ret += len(self.hosts[i])
+        return ret
+
     def add_open(self, addr, port, proto, hn):
         if proto != 'tcp' and proto != 'udp':
             raise Exception('unknown protocol %s' % proto)
@@ -92,6 +98,14 @@ class ScanState(object):
         self._alerts_open = []
         self._alerts_closed = []
 
+    def last_scan_total_services(self):
+        return self._lastscan.total_services()
+
+    def previous_scan_total_services(self):
+        if len(self._scanlist) > 1:
+            return self._scanlist[1].total_services()
+        return 0
+
     def set_last(self, last):
         self._lastscan = last
         if len(self._scanlist) == self.KEEP_SCANS:
@@ -106,15 +120,14 @@ class ScanState(object):
     def prev_service_status(self, addr, port, proto):
         openprev = 0
         closedprev = 0
+        if len(self._scanlist) <= 1:
+            return (0, 0)
         for s in self._scanlist[1:]:
             if s.open_exists(addr, port, proto):
                 openprev += 1
             else:
                 closedprev += 1
         return (openprev, closedprev)
-
-    def find_closed_prev(self, addr, port, proto):
-        pass
 
     def calculate_new_open(self):
         if len(self._scanlist) <= 1:
@@ -283,6 +296,10 @@ def domain():
     tmpfile.write('CPREV: number of times service was closed in ' \
         'previous scans\n')
     tmpfile.write('maximum previous scans stored: %d\n' % state.KEEP_SCANS)
+    tmpfile.write('current total services: %d\n' % \
+        state.last_scan_total_services())
+    tmpfile.write('previous total services: %d\n' % \
+        state.previous_scan_total_services())
 
     state.clear_outfile()
     write_scanstate()
