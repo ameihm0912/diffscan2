@@ -12,7 +12,9 @@ import cPickle
 import errno
 import tempfile
 
+# Change this to suit your environment
 nmap_scanoptions = '-sS -vv --top-ports 20 -T4'
+
 nmap_logoptions = Template('-oG $tmppath')
 nmap_inoptions = Template('-iL $inpath')
 
