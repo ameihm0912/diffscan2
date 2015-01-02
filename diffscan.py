@@ -235,6 +235,7 @@ def domain():
     global statefile
     global state
     global tmpfile
+    global debugging
 
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'dhs:')
