@@ -277,7 +277,7 @@ def run_nmap(targets):
 
 def usage():
     sys.stdout.write('usage: diffscan.py [-d] [-s path] [-h] targets_file ' \
-        'recipient\n')
+        'recipient groupname\n')
     sys.exit(0)
 
 def domain():
@@ -297,10 +297,11 @@ def domain():
             debugging = True
         elif o == '-s':
             statefile = a
-    if len(args) == 0:
+    if len(args) < 3:
         usage()
     targetfile = args[0]
     recip = args[1]
+    groupname = args[2]
 
     state = load_scanstate()
 
@@ -309,7 +310,7 @@ def domain():
     state.register_outfile(tmpfile)
 
     hn = os.uname()[1]
-    tmpfile.write('Subject: diffscan2 %s\n' % hn)
+    tmpfile.write('Subject: diffscan2 %s %s\n' % (groupname, hn))
     tmpfile.write('From: diffscan2 <noreply@%s>\n' % hn)
     tmpfile.write('To: %s\n' % recip)
     tmpfile.write('\n')
