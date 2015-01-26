@@ -155,11 +155,17 @@ class ScanState(object):
             for p in self._lastscan.get_host_ports(i):
                 prevscan = self._scanlist[1]
                 if not prevscan.open_exists(i, p[0], p[1]):
+                    statstr = 'OPEN'
                     dns = self._lastscan.dnsmap[i]
+                    # If this host isn't in the previous up or down list,
+                    # note it as a new host
+                    if (i not in prevscan.uphosts) and \
+                        (i not in prevscan.downhosts):
+                        statstr = 'OPENNEWHOST'
                     openprev, closedprev = \
                         self.prev_service_status(i, p[0], p[1])
                     self._alerts_open.append(Alert(i, p[0], p[1], dns,
-                        openprev, closedprev, 'OPEN'))
+                        openprev, closedprev, statstr))
 
     def calculate_new_closed(self):
         if len(self._scanlist) <= 1:
