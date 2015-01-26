@@ -28,6 +28,8 @@ class ScanData(object):
         self.scantime = time.gmtime()
         self.hosts = {}
         self.dnsmap = {}
+        self.uphosts = []
+        self.downhosts = []
 
     def get_hosts(self):
         return self.hosts.keys()
@@ -58,20 +60,21 @@ class ScanData(object):
         self.hosts[addr].append([int(port), proto])
 
 class Alert(object):
-    def __init__(self, host, port, proto, dns, open_prev, closed_prev):
+    def __init__(self, host, port, proto, dns, open_prev, closed_prev, statstr):
         self.host = host
         self.port = port
         self.proto = proto
         self.dns = dns
         self.open_prev = open_prev
         self.closed_prev = closed_prev
+        self.statstr = statstr
 
     @staticmethod
     def alert_header():
         return 'STATUS HOST PORT PROTO OPREV CPREV DNS'
 
     def __str__(self):
-        return '%s %s %s %s %s %s' % (self.host,
+        return '%s %s %s %s %s %s %s' % (self.statstr, self.host,
             str(self.port), self.proto,
             str(self.open_prev), str(self.closed_prev),
             self.dns)
@@ -85,6 +88,24 @@ class ScanState(object):
         self._alerts_open = []
         self._alerts_closed = []
         self._outfile = None
+
+    def up_trend(self):
+        ret = ''
+        for i in self._scanlist:
+            if len(ret) == 0:
+                ret = '%d' % len(i.uphosts)
+            else:
+                ret += ',%d' % len(i.uphosts)
+        return ret
+
+    def down_trend(self):
+        ret = ''
+        for i in self._scanlist:
+            if len(ret) == 0:
+                ret = '%d' % len(i.downhosts)
+            else:
+                ret += ',%d' % len(i.downhosts)
+        return ret
 
     def register_outfile(self, o):
         self._outfile = o
@@ -138,7 +159,7 @@ class ScanState(object):
                     openprev, closedprev = \
                         self.prev_service_status(i, p[0], p[1])
                     self._alerts_open.append(Alert(i, p[0], p[1], dns,
-                        openprev, closedprev))
+                        openprev, closedprev, 'OPEN'))
 
     def calculate_new_closed(self):
         if len(self._scanlist) <= 1:
@@ -147,21 +168,30 @@ class ScanState(object):
         for i in prevscan.get_hosts():
             for p in prevscan.get_host_ports(i):
                 if not self._lastscan.open_exists(i, p[0], p[1]):
-                    dns = self._lastscan.dnsmap[i]
+                    statstr = 'CLOSED'
+                    # See if the host existed in the current scan, if it did
+                    # use that hostname, otherwise grab previous
+                    if i in self._lastscan.dnsmap:
+                        dns = self._lastscan.dnsmap[i]
+                    else:
+                        # If we didn't have a dns map entry for it, that means
+                        # the host wasn't even up, note this in the status
+                        statstr = 'CLOSEDDOWN'
+                        dns = prevscan.dnsmap[i]
                     openprev, closedprev = \
                         self.prev_service_status(i, p[0], p[1])
                     self._alerts_closed.append(Alert(i, p[0], p[1], dns,
-                        openprev, closedprev))
+                        openprev, closedprev, statstr))
 
     def print_open_alerts(self):
         self._outfile.write('%s\n' % Alert.alert_header())
         for i in self._alerts_open:
-            self._outfile.write('OPEN %s\n' % str(i))
+            self._outfile.write('%s\n' % str(i))
 
     def print_closed_alerts(self):
         self._outfile.write('%s\n' % Alert.alert_header())
         for i in self._alerts_closed:
-            self._outfile.write('CLOSED %s\n' % str(i))
+            self._outfile.write('%s\n' % str(i))
 
 state = None
 tmpfile = None
@@ -197,6 +227,14 @@ def parse_output(path):
         if buf == '':
             break
         buf = buf.strip()
+        m = re.search('Host: (\S+) \(([^)]*)\).*Status: Up', buf)
+        if m != None:
+            addr = m.group(1)
+            new.uphosts.append(addr)
+        m = re.search('Host: (\S+) \(([^)]*)\).*Status: Down', buf)
+        if m != None:
+            addr = m.group(1)
+            new.downhosts.append(addr)
         m = re.search('Host: (\S+) \(([^)]*)\).*Ports: (.*)$', buf)
         if m != None:
             addr = m.group(1)
@@ -298,6 +336,8 @@ def domain():
         state.last_scan_total_services())
     tmpfile.write('previous total services: %d\n' % \
         state.previous_scan_total_services())
+    tmpfile.write('up trend: %s\n' % state.up_trend())
+    tmpfile.write('down trend: %s\n' % state.down_trend())
 
     state.clear_outfile()
     write_scanstate()
