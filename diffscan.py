@@ -11,6 +11,8 @@ import tempfile
 import cPickle
 import errno
 import tempfile
+import shutil
+import calendar
 
 # Edit the nmap_scanoptions variable below to configure generic options
 # that are passed by nmap to the script. This script generates email using
@@ -204,6 +206,20 @@ tmpfile = None
 debugging = False
 
 statefile = './diffscan.state'
+outdir = './diffscan_out'
+
+def outdir_setup():
+    if not os.path.isdir(outdir):
+        os.mkdir(outdir, 0755)
+    if not os.access(outdir, os.W_OK):
+        sys.stderr.write('%s not writable\n' % outdir)
+        sys.exit(1)
+
+def copy_nmap_out(p):
+    tval = int(calendar.timegm(time.gmtime()))
+    pidval = os.getpid()
+    fname = os.path.join(outdir, 'nmap-%d-%d.out' % (tval, pidval))
+    shutil.copyfile(p, fname)
 
 def load_scanstate():
     try:
@@ -279,26 +295,30 @@ def run_nmap(targets):
 
     parse_output(tf[1])
 
+    copy_nmap_out(tf[1])
     os.remove(tf[1])
 
 def usage():
-    sys.stdout.write('usage: diffscan.py [-d] [-s path] [-h] targets_file ' \
-        'recipient groupname\n')
+    sys.stdout.write('usage: diffscan.py [-dh] [-o path] [-s path]' \
+        ' targets_file recipient groupname\n')
     sys.exit(0)
 
 def domain():
     global statefile
     global state
+    global outdir
     global tmpfile
     global debugging
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'dhs:')
+        opts, args = getopt.getopt(sys.argv[1:], 'dho:s:')
     except getopt.GetoptError:
         usage()
     for o, a in opts:
         if o == '-h':
             usage()
+        elif o == '-o':
+            outdir = a
         elif o == '-d':
             debugging = True
         elif o == '-s':
@@ -308,6 +328,8 @@ def domain():
     targetfile = args[0]
     recip = args[1]
     groupname = args[2]
+
+    outdir_setup()
 
     state = load_scanstate()
 
