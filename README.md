@@ -24,7 +24,8 @@ subject to differentiate between different instances of diffscan2.
 
 A state file (by default ./diffscan.state) is used between executions to
 keep state on previous scans. Additionally, the nmap output is saved in an
-output directory for future review if required (by default ./diffscan_out)
+output directory for future review if required (by default ./diffscan_out).
+The -s and -o flags can be used to change these defaults.
 
 ## Reporting
 
