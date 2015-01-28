@@ -213,6 +213,9 @@ class ScanState(object):
 state = None
 tmpfile = None
 debugging = False
+myhost = None
+recip = None
+groupname = None
 
 statefile = './diffscan.state'
 outdir = './diffscan_out'
@@ -281,7 +284,15 @@ def parse_output(path):
 
     state.set_last(new)
 
-def diffscan_fail():
+def diffscan_fail(errmsg):
+    buf = 'Subject: diffscan2 %s %s\n' % (groupname, myhost)
+    buf += 'From: diffscan2 <noreply@%s>\n' % myhost
+    buf += 'To: %s\n' % recip
+    buf += '\n'
+    buf += 'diffscan execution failed\n\n'
+    buf += '%s\n' % errmsg
+    sp = subprocess.Popen(['sendmail', '-t'], stdin=subprocess.PIPE)
+    sp.communicate(buf)
     sys.exit(1)
 
 def run_nmap(targets):
@@ -294,13 +305,14 @@ def run_nmap(targets):
     nmap_args += nmap_inoptions.substitute(inpath=targets).split()
 
     nfd = open('/dev/null', 'w')
-    ret = subprocess.call(['nmap',] + nmap_args, stdout=nfd)
+    try:
+        ret = subprocess.call(['nmap',] + nmap_args, stdout=nfd)
+    except Exception as e:
+        diffscan_fail('executing of nmap failed, %s' % str(e))
     nfd.close()
 
     if ret != 0:
-        tmpfile.write('nmap failed with return code %d, exiting\n' \
-            % ret)
-        diffscan_fail()
+        diffscan_fail('nmap failed with return code %d, exiting' % ret)
 
     parse_output(tf[1])
 
@@ -318,6 +330,9 @@ def domain():
     global outdir
     global tmpfile
     global debugging
+    global myhost
+    global recip
+    global groupname
 
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'dho:s:')
@@ -346,9 +361,9 @@ def domain():
     tmpfile = os.fdopen(tmpout[0], 'w')
     state.register_outfile(tmpfile)
 
-    hn = os.uname()[1]
-    tmpfile.write('Subject: diffscan2 %s %s\n' % (groupname, hn))
-    tmpfile.write('From: diffscan2 <noreply@%s>\n' % hn)
+    myhost = os.uname()[1]
+    tmpfile.write('Subject: diffscan2 %s %s\n' % (groupname, myhost))
+    tmpfile.write('From: diffscan2 <noreply@%s>\n' % myhost)
     tmpfile.write('To: %s\n' % recip)
     tmpfile.write('\n')
 
