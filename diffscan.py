@@ -29,7 +29,7 @@ import calendar
 #
 # Be sure to include -vv so hosts that are down are reported in the
 # output for correct tracking.
-nmap_scanoptions = '-sS -vv --top-ports 20 -T4'
+nmap_scanoptions = '-vv -sS -PE -PS22,25,80,443,3306,8443,9100 -T4 --top-ports 250 --privileged'
 
 nmap_logoptions = Template('-oG $tmppath')
 nmap_inoptions = Template('-iL $inpath')
