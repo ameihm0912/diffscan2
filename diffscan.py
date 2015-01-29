@@ -30,8 +30,9 @@ import calendar
 #
 # Be sure to include -vv so hosts that are down are reported in the
 # output for correct tracking.
-nmap_scanoptions = '-vv -sS -PE -PS22,25,80,443,3306,8443,9100 -T4 --top-ports 250 --privileged'
+nmap_scanoptions = '-vv -sS -PE -PS22,25,80,443,3306,8443,9100 -T4 --privileged'
 
+nmap_topports = Template('--top-ports $topports')
 nmap_logoptions = Template('-oG $tmppath')
 nmap_inoptions = Template('-iL $inpath')
 
@@ -220,6 +221,7 @@ debugging = False
 myhost = None
 recip = None
 groupname = None
+topports = 2000
 
 statefile = './diffscan.state'
 outdir = './diffscan_out'
@@ -305,6 +307,7 @@ def run_nmap(targets):
 
     tf = tempfile.mkstemp()
     os.close(tf[0])
+    nmap_args += nmap_topports.substitute(topports=topports).split()
     nmap_args += nmap_logoptions.substitute(tmppath=tf[1]).split()
     nmap_args += nmap_inoptions.substitute(inpath=targets).split()
 
@@ -325,7 +328,7 @@ def run_nmap(targets):
 
 def usage():
     sys.stdout.write('usage: diffscan.py [-dh] [-o path] [-s path]' \
-        ' targets_file recipient groupname\n')
+        ' [-m topports] targets_file recipient groupname\n')
     sys.exit(0)
 
 def create_lock():
@@ -352,11 +355,12 @@ def domain():
     global myhost
     global recip
     global groupname
+    global topports
 
     os.environ['PATH'] = os.environ['PATH'] + append_path
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'dho:s:')
+        opts, args = getopt.getopt(sys.argv[1:], 'dhm:o:s:')
     except getopt.GetoptError:
         usage()
     for o, a in opts:
@@ -366,6 +370,8 @@ def domain():
             outdir = a
         elif o == '-d':
             debugging = True
+        elif o == '-m':
+            topports = a
         elif o == '-s':
             statefile = a
     if len(args) < 3:
