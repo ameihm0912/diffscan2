@@ -8,6 +8,7 @@
 
 import sys
 import os
+import fcntl
 from string import Template
 import getopt
 import re
@@ -212,6 +213,7 @@ class ScanState(object):
         for i in self._alerts_closed:
             self._outfile.write('%s\n' % str(i))
 
+lockfile = None
 state = None
 tmpfile = None
 debugging = False
@@ -326,6 +328,21 @@ def usage():
         ' targets_file recipient groupname\n')
     sys.exit(0)
 
+def create_lock():
+    global lockfile
+
+    lfname = statefile + '.lock'
+    lockfile = open(lfname, 'w')
+    fcntl.lockf(lockfile, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    lockfile.write(str(os.getpid()))
+    lockfile.flush()
+
+def release_lock():
+    lfname = statefile + '.lock'
+
+    lockfile.close()
+    os.remove(lfname)
+
 def domain():
     global statefile
     global state
@@ -358,6 +375,8 @@ def domain():
     groupname = args[2]
 
     outdir_setup()
+
+    create_lock()
 
     state = load_scanstate()
 
@@ -409,6 +428,8 @@ def domain():
     sp = subprocess.Popen(['sendmail', '-t'], stdin=subprocess.PIPE)
     sp.communicate(buf)
     os.remove(tmpout[1])
+
+    release_lock()
 
 if __name__ == '__main__':
     domain()
