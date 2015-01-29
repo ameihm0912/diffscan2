@@ -34,6 +34,8 @@ nmap_scanoptions = '-vv -sS -PE -PS22,25,80,443,3306,8443,9100 -T4 --top-ports 2
 nmap_logoptions = Template('-oG $tmppath')
 nmap_inoptions = Template('-iL $inpath')
 
+append_path = ':/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/usr/lib'
+
 class ScanData(object):
     def __init__(self):
         self.scantime = time.gmtime()
@@ -333,6 +335,8 @@ def domain():
     global myhost
     global recip
     global groupname
+
+    os.environ['PATH'] = os.environ['PATH'] + append_path
 
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'dho:s:')
