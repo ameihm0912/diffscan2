@@ -35,6 +35,7 @@ nmap_scanoptions = '-vv -sS -PE -PS22,25,80,443,3306,8443,9100 -T4 --privileged'
 nmap_topports = Template('--top-ports $topports')
 nmap_logoptions = Template('-oG $tmppath')
 nmap_inoptions = Template('-iL $inpath')
+nmap_portspec = Template('-p $portspec')
 
 append_path = ':/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/usr/lib'
 
@@ -222,6 +223,7 @@ myhost = None
 recip = None
 groupname = None
 topports = 2000
+portspec = None
 
 statefile = './diffscan.state'
 outdir = './diffscan_out'
@@ -307,7 +309,10 @@ def run_nmap(targets):
 
     tf = tempfile.mkstemp()
     os.close(tf[0])
-    nmap_args += nmap_topports.substitute(topports=topports).split()
+    if portspec != None:
+        nmap_args += nmap_portspec.substitute(portspec=portspec).split()
+    else:
+        nmap_args += nmap_topports.substitute(topports=topports).split()
     nmap_args += nmap_logoptions.substitute(tmppath=tf[1]).split()
     nmap_args += nmap_inoptions.substitute(inpath=targets).split()
 
@@ -327,8 +332,14 @@ def run_nmap(targets):
     os.remove(tf[1])
 
 def usage():
-    sys.stdout.write('usage: diffscan.py [-dh] [-o path] [-s path]' \
-        ' [-m topports] targets_file recipient groupname\n')
+    sys.stdout.write('usage: diffscan.py [options] targets_file' \
+        ' recipient groupname\n\n' \
+        'options:\n\n' \
+        '\t-h\t\tusage information\n' \
+        '\t-m num\t\ttop ports to scan (2000, see nmap --top-ports)\n' \
+        '\t-o path\t\tdirectory to save nmap output (./diffscan_out)\n' \
+        '\t-p spec\t\tinstead of top ports use port spec (see nmap -p)\n' \
+        '\t-s path\t\tpath to state file (./diffscan.state)\n\n')
     sys.exit(0)
 
 def create_lock():
@@ -356,11 +367,12 @@ def domain():
     global recip
     global groupname
     global topports
+    global portspec
 
     os.environ['PATH'] = os.environ['PATH'] + append_path
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'dhm:o:s:')
+        opts, args = getopt.getopt(sys.argv[1:], 'dhm:o:p:s:')
     except getopt.GetoptError:
         usage()
     for o, a in opts:
@@ -368,6 +380,8 @@ def domain():
             usage()
         elif o == '-o':
             outdir = a
+        elif o == '-p':
+            portspec = a
         elif o == '-d':
             debugging = True
         elif o == '-m':
