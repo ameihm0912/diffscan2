@@ -293,9 +293,9 @@ def parse_output(path):
 
     state.set_last(new)
 
-def diffscan_fail(errmsg):
+def diffscan_fail_notify(errmsg):
     if nosmtp:
-        sys.exit(1)
+        return
     buf = 'Subject: diffscan2 %s %s\n' % (groupname, myhost)
     buf += 'From: diffscan2 <noreply@%s>\n' % myhost
     buf += 'To: %s\n' % recip
@@ -304,7 +304,6 @@ def diffscan_fail(errmsg):
     buf += '%s\n' % errmsg
     sp = subprocess.Popen(['sendmail', '-t'], stdin=subprocess.PIPE)
     sp.communicate(buf)
-    sys.exit(1)
 
 def run_nmap(targets):
     nmap_args = []
@@ -323,16 +322,21 @@ def run_nmap(targets):
     try:
         ret = subprocess.call(['nmap',] + nmap_args, stdout=nfd)
     except Exception as e:
-        diffscan_fail('executing of nmap failed, %s' % str(e))
+        os.remove(tf[1])
+        diffscan_fail_notify('executing of nmap failed, %s' % str(e))
+        return False
     nfd.close()
 
     if ret != 0:
-        diffscan_fail('nmap failed with return code %d, exiting' % ret)
+        os.remove(tf[1])
+        diffscan_fail_notify('nmap failed with return code %d, exiting' % ret)
+        return False
 
     parse_output(tf[1])
 
     copy_nmap_out(tf[1])
     os.remove(tf[1])
+    return True
 
 def usage():
     sys.stdout.write('usage: diffscan.py [options] targets_file' \
@@ -423,7 +427,11 @@ def domain():
 
     tmpfile.write('diffscan2 results output\n\n')
 
-    run_nmap(targetfile)
+    if not run_nmap(targetfile):
+        if not nosmtp:
+            tmpfile.close()
+            os.remove(tmpout[1])
+        sys.exit(1)
     state.calculate()
     tmpfile.write('New Open Service List\n')
     tmpfile.write('---------------------\n')
