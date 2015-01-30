@@ -27,6 +27,20 @@ keep state on previous scans. Additionally, the nmap output is saved in an
 output directory for future review if required (by default ./diffscan_out).
 The -s and -o flags can be used to change these defaults.
 
+```
+usage: diffscan.py [options] targets_file recipient groupname
+
+options:
+
+	-h		usage information
+	-m num		top ports to scan (2000, see nmap --top-ports)
+	-n		no smtp, write output to stdout (recipient ignored)
+	-o path		directory to save nmap output (./diffscan_out)
+	-p spec		instead of top ports use port spec (see nmap -p)
+	-s path		path to state file (./diffscan.state)
+
+```
+
 ## Reporting
 
 An example report is shown below.
