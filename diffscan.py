@@ -224,6 +224,7 @@ recip = None
 groupname = None
 topports = 2000
 portspec = None
+nosmtp = False
 
 statefile = './diffscan.state'
 outdir = './diffscan_out'
@@ -293,6 +294,8 @@ def parse_output(path):
     state.set_last(new)
 
 def diffscan_fail(errmsg):
+    if nosmtp:
+        sys.exit(1)
     buf = 'Subject: diffscan2 %s %s\n' % (groupname, myhost)
     buf += 'From: diffscan2 <noreply@%s>\n' % myhost
     buf += 'To: %s\n' % recip
@@ -337,6 +340,7 @@ def usage():
         'options:\n\n' \
         '\t-h\t\tusage information\n' \
         '\t-m num\t\ttop ports to scan (2000, see nmap --top-ports)\n' \
+        '\t-n\t\tno smtp, write output to stdout (recipient ignored)\n' \
         '\t-o path\t\tdirectory to save nmap output (./diffscan_out)\n' \
         '\t-p spec\t\tinstead of top ports use port spec (see nmap -p)\n' \
         '\t-s path\t\tpath to state file (./diffscan.state)\n\n')
@@ -368,11 +372,12 @@ def domain():
     global groupname
     global topports
     global portspec
+    global nosmtp
 
     os.environ['PATH'] = os.environ['PATH'] + append_path
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'dhm:o:p:s:')
+        opts, args = getopt.getopt(sys.argv[1:], 'dhm:no:p:s:')
     except getopt.GetoptError:
         usage()
     for o, a in opts:
@@ -386,6 +391,8 @@ def domain():
             debugging = True
         elif o == '-m':
             topports = a
+        elif o == '-n':
+            nosmtp = True
         elif o == '-s':
             statefile = a
     if len(args) < 3:
@@ -400,15 +407,19 @@ def domain():
 
     state = load_scanstate()
 
-    tmpout = tempfile.mkstemp()
-    tmpfile = os.fdopen(tmpout[0], 'w')
+    if not nosmtp:
+        tmpout = tempfile.mkstemp()
+        tmpfile = os.fdopen(tmpout[0], 'w')
+    else:
+        tmpfile = sys.stdout
     state.register_outfile(tmpfile)
 
-    myhost = os.uname()[1]
-    tmpfile.write('Subject: diffscan2 %s %s\n' % (groupname, myhost))
-    tmpfile.write('From: diffscan2 <noreply@%s>\n' % myhost)
-    tmpfile.write('To: %s\n' % recip)
-    tmpfile.write('\n')
+    if not nosmtp:
+        myhost = os.uname()[1]
+        tmpfile.write('Subject: diffscan2 %s %s\n' % (groupname, myhost))
+        tmpfile.write('From: diffscan2 <noreply@%s>\n' % myhost)
+        tmpfile.write('To: %s\n' % recip)
+        tmpfile.write('\n')
 
     tmpfile.write('diffscan2 results output\n\n')
 
@@ -438,16 +449,17 @@ def domain():
     state.clear_outfile()
     write_scanstate()
 
-    tmpfile.close()
+    if not nosmtp:
+        tmpfile.close()
 
-    f = open(tmpout[1], 'r')
-    buf = f.read()
-    f.close()
-    if debugging:
-        sys.stdout.write(buf)
-    sp = subprocess.Popen(['sendmail', '-t'], stdin=subprocess.PIPE)
-    sp.communicate(buf)
-    os.remove(tmpout[1])
+        f = open(tmpout[1], 'r')
+        buf = f.read()
+        f.close()
+        if debugging:
+            sys.stdout.write(buf)
+        sp = subprocess.Popen(['sendmail', '-t'], stdin=subprocess.PIPE)
+        sp.communicate(buf)
+        os.remove(tmpout[1])
 
     release_lock()
 
