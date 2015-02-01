@@ -301,7 +301,7 @@ def diffscan_fail_notify(errmsg):
         return
     buf = 'Subject: diffscan2 %s %s\n' % (groupname, myhost)
     buf += 'From: diffscan2 <noreply@%s>\n' % myhost
-    buf += 'To: %s\n' % recip
+    buf += 'To: %s\n' % ','.join(recip)
     buf += '\n'
     buf += 'diffscan execution failed\n\n'
     buf += '%s\n' % errmsg
@@ -343,7 +343,7 @@ def run_nmap(targets):
 
 def usage():
     sys.stdout.write('usage: diffscan.py [options] targets_file' \
-        ' recipient groupname\n\n' \
+        ' recipients groupname\n\n' \
         'options:\n\n' \
         '\t-h\t\tusage information\n' \
         '\t-m num\t\ttop ports to scan (2000, see nmap --top-ports)\n' \
@@ -405,7 +405,7 @@ def domain():
     if len(args) < 3:
         usage()
     targetfile = args[0]
-    recip = args[1]
+    recip = args[1].split(',')
     groupname = args[2]
 
     outdir_setup()
@@ -421,12 +421,11 @@ def domain():
         tmpfile = sys.stdout
     state.register_outfile(tmpfile)
 
-    if not nosmtp:
-        myhost = os.uname()[1]
-        tmpfile.write('Subject: diffscan2 %s %s\n' % (groupname, myhost))
-        tmpfile.write('From: diffscan2 <noreply@%s>\n' % myhost)
-        tmpfile.write('To: %s\n' % recip)
-        tmpfile.write('\n')
+    myhost = os.uname()[1]
+    tmpfile.write('Subject: diffscan2 %s %s\n' % (groupname, myhost))
+    tmpfile.write('From: diffscan2 <noreply@%s>\n' % myhost)
+    tmpfile.write('To: %s\n' % ','.join(recip))
+    tmpfile.write('\n')
 
     tmpfile.write('diffscan2 results output\n\n')
 
