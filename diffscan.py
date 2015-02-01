@@ -30,14 +30,16 @@ import calendar
 #
 # Be sure to include -vv so hosts that are down are reported in the
 # output for correct tracking.
-nmap_scanoptions = '-vv -sS -PE -PS22,25,80,443,3306,8443,9100 -T4 --privileged'
+nmap_scanoptions = '-vv -sS -PE -PS22,25,80,443,3306,8443,9100 -T4 ' + \
+        '--privileged'
 
 nmap_topports = Template('--top-ports $topports')
 nmap_logoptions = Template('-oG $tmppath')
 nmap_inoptions = Template('-iL $inpath')
 nmap_portspec = Template('-p $portspec')
 
-append_path = ':/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/usr/lib'
+append_path = ':/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:' + \
+        '/usr/local/sbin:/usr/lib'
 
 class ScanData(object):
     def __init__(self):
@@ -76,7 +78,8 @@ class ScanData(object):
         self.hosts[addr].append([int(port), proto])
 
 class Alert(object):
-    def __init__(self, host, port, proto, dns, open_prev, closed_prev, statstr):
+    def __init__(self, host, port, proto, dns, open_prev, closed_prev,
+        statstr):
         self.host = host
         self.port = port
         self.proto = proto
