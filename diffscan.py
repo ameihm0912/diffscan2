@@ -477,8 +477,6 @@ def domain():
         f.close()
         if debugging:
             sys.stdout.write(buf)
-        print(quiet)
-        print(state.outstanding_alerts())
         if not (quiet and not state.outstanding_alerts()):
             sp = subprocess.Popen(['sendmail', '-t'], stdin=subprocess.PIPE)
             sp.communicate(buf)
