@@ -38,6 +38,7 @@ options:
 -o path     directory to save nmap output (./diffscan_out)
 -p spec     instead of top ports use port spec (see nmap -p)
 -s path     path to state file (./diffscan.state)
+-q          Don't send email if no changes
 
 ```
 
@@ -66,4 +67,3 @@ An example report is shown below.
 	up trend: 6,5,5,4
 	down trend: 506,507,507,252
 ```
-
